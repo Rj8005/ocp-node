@@ -246,13 +246,9 @@ func (n *Node) Address() string {
 }
 
 func (n *Node) PeerCount() int {
-	total := 0
-	for i := 0; i < BucketLen; i++ {
-		n.buckets[i].mu.RLock()
-		total += len(n.buckets[i].contacts)
-		n.buckets[i].mu.RUnlock()
-	}
-	return total
+	n.peersMu.RLock()
+	defer n.peersMu.RUnlock()
+	return len(n.peers)
 }
 
 func (n *Node) RecordCount() int {
@@ -260,13 +256,13 @@ func (n *Node) RecordCount() int {
 }
 
 func (n *Node) GetPeers() []string {
-	var peers []string
-	for i := 0; i < BucketLen; i++ {
-		for _, c := range n.buckets[i].getContacts() {
-			peers = append(peers, c.Address)
-		}
+	n.peersMu.RLock()
+	defer n.peersMu.RUnlock()
+	result := make([]string, 0, len(n.peers))
+	for addr := range n.peers {
+		result = append(result, addr)
 	}
-	return peers
+	return result
 }
 
 func (n *Node) AddPeer(address string) {

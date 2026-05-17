@@ -71,9 +71,13 @@ func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (s *HTTPServer) handlePeers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	peers := s.node.GetPeers()
+	if peers == nil {
+		peers = []string{}
+	}
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"peers": s.node.GetPeers(),
-		"count": s.node.PeerCount(),
+		"peers": peers,
+		"count": len(peers),
 	})
 }
 
