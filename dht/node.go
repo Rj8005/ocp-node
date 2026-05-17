@@ -150,6 +150,8 @@ type Node struct {
 	conn    *net.UDPConn
 	quit    chan struct{}
 	logger  *log.Logger
+	peers   map[string]struct{}
+	peersMu sync.RWMutex
 }
 
 func NewNode(address string, logger *log.Logger) (*Node, error) {
@@ -159,6 +161,7 @@ func NewNode(address string, logger *log.Logger) (*Node, error) {
 		store:  NewStore(),
 		quit:   make(chan struct{}),
 		logger: logger,
+		peers:  make(map[string]struct{}),
 	}
 	for i := 0; i < BucketLen; i++ {
 		n.buckets[i] = &bucket{}
@@ -264,4 +267,18 @@ func (n *Node) GetPeers() []string {
 		}
 	}
 	return peers
+}
+
+func (n *Node) AddPeer(address string) {
+	n.peersMu.Lock()
+	defer n.peersMu.Unlock()
+	n.peers[address] = struct{}{}
+	n.logger.Printf("[DHT] peer connected: %s (active: %d)", address, len(n.peers))
+}
+
+func (n *Node) RemovePeer(address string) {
+	n.peersMu.Lock()
+	defer n.peersMu.Unlock()
+	delete(n.peers, address)
+	n.logger.Printf("[DHT] peer disconnected: %s (active: %d)", address, len(n.peers))
 }
