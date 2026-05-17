@@ -15,7 +15,7 @@ ocp-node/
     └── websocket.go  — RFC 6455 WebSocket server, OCP message dispatcher
 ```
 
-## Running
+## Running locally
 
 ```bash
 go run .
@@ -23,9 +23,38 @@ go run .
 
 The node listens on **port 5000** (WebSocket at `/ws`, health check at `/health`).
 
+## Deployment — Render
+
+Bootstrap nodes are hosted on [Render](https://render.com) as a Docker-based web service.
+
+### Steps
+
+1. Push this repo to GitHub.
+2. In Render: **New → Web Service → Connect your repo**.
+3. Set the following:
+   - **Environment:** Docker
+   - **Port:** 5000
+   - **Instance type:** Free (or Starter for always-on)
+4. Deploy. Render builds via the [Dockerfile](Dockerfile) and exposes the service over HTTPS.
+
+### Always-on bootstrap node
+
+Free-tier Render instances spin down after inactivity. For a reliable bootstrap node use a **Starter** (paid) instance, or set up a cron job / UptimeRobot to ping `/health` every 5 minutes.
+
+### Updating bootstrap addresses
+
+After deploying, copy the Render service URL (e.g. `ocp-bootstrap-1.onrender.com`) and update `main.go`:
+
+```go
+var bootstrapNodes = []string{
+    "ocp-bootstrap-1.onrender.com:443",
+    "ocp-bootstrap-2.onrender.com:443",
+}
+```
+
 ## WebSocket Protocol
 
-All messages are JSON. Send to `/ws`.
+All messages are JSON. Connect to `wss://<host>/ws`.
 
 ### FIND_NODE
 ```json
@@ -56,17 +85,6 @@ Response (found):
 Response (not found — returns closest nodes):
 ```json
 {"type":"RESPONSE","nodes":[...]}
-```
-
-## Bootstrap Nodes
-
-Edit the `bootstrapNodes` slice in [main.go](main.go) before deployment:
-
-```go
-var bootstrapNodes = []string{
-    "peer1.example.com:5000",
-    "peer2.example.com:5000",
-}
 ```
 
 ## Configuration
