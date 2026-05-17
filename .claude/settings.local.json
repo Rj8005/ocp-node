@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(go build *)"
+      "Bash(go build *)",
+      "Bash(Remove-Item F:\\\\ocp-node\\\\fly.toml)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

@@ -7,19 +7,19 @@ import (
 	"syscall"
 	"time"
 
-	"ocp-node/dht"
-	"ocp-node/server"
+	"github.com/Rj8005/ocp-node/dht"
+	"github.com/Rj8005/ocp-node/server"
 )
 
 const (
-	listenAddr = ":5000"
-	nodeAddr   = "localhost:5000"
+	httpPort = 5000
+	nodeAddr = "localhost:5000"
 )
 
 // Bootstrap nodes — update these with real peer addresses before deployment.
 var bootstrapNodes = []string{
-	// "peer1.ocp-network.example:5000",
-	// "peer2.ocp-network.example:5000",
+	// "ocp-bootstrap-1.onrender.com:443",
+	// "ocp-bootstrap-2.onrender.com:443",
 }
 
 func main() {
@@ -32,12 +32,11 @@ func main() {
 		logger.Fatalf("[main] failed to create node: %v", err)
 	}
 
-	logger.Printf("[main] node ID: %s", node.ID.String())
-	logger.Printf("[main] node address: %s", node.Address)
+	logger.Printf("[main] node ID: %s", node.IDHex())
+	logger.Printf("[main] node address: %s", node.Address())
 
 	routing := dht.NewRoutingTable(node, logger)
 
-	// Bootstrap
 	if len(bootstrapNodes) > 0 {
 		logger.Printf("[main] bootstrapping with %d nodes", len(bootstrapNodes))
 		node.Bootstrap(bootstrapNodes)
@@ -48,7 +47,7 @@ func main() {
 	// Announce own address to the DHT.
 	self := &dht.Contact{
 		ID:       node.ID,
-		Address:  node.Address,
+		Address:  node.Address(),
 		LastSeen: time.Now(),
 	}
 	routing.UpdateRoutingTable(self)
@@ -56,23 +55,18 @@ func main() {
 
 	quit := make(chan struct{})
 
-	// Background: bucket refresh.
 	go routing.StartRefreshLoop(quit)
-
-	// Background: store cleanup every 10 minutes.
 	go node.Store().StartCleanupLoop(10*time.Minute, quit)
 
-	// WebSocket server.
-	ws := server.NewWSServer(node, routing, logger)
+	httpServer := server.NewHTTPServer(node, httpPort)
 
 	go func() {
-		logger.Printf("[main] WebSocket server starting on %s", listenAddr)
-		if err := ws.ListenAndServe(listenAddr); err != nil {
+		logger.Printf("[main] HTTP server starting on port %d", httpPort)
+		if err := httpServer.Start(); err != nil {
 			logger.Fatalf("[main] server error: %v", err)
 		}
 	}()
 
-	// Graceful shutdown on SIGINT / SIGTERM.
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	s := <-sig

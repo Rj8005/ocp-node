@@ -142,23 +142,23 @@ func (b *bucket) getContacts() []*Contact {
 }
 
 type Node struct {
-	ID       NodeID
-	Address  string
-	buckets  [BucketLen]*bucket
-	store    *Store
-	mu       sync.RWMutex
-	conn     *net.UDPConn
-	quit     chan struct{}
-	logger   *log.Logger
+	ID      NodeID
+	addr    string
+	buckets [BucketLen]*bucket
+	store   *Store
+	mu      sync.RWMutex
+	conn    *net.UDPConn
+	quit    chan struct{}
+	logger  *log.Logger
 }
 
 func NewNode(address string, logger *log.Logger) (*Node, error) {
 	n := &Node{
-		ID:      NewNodeID(),
-		Address: address,
-		store:   NewStore(),
-		quit:    make(chan struct{}),
-		logger:  logger,
+		ID:     NewNodeID(),
+		addr:   address,
+		store:  NewStore(),
+		quit:   make(chan struct{}),
+		logger: logger,
 	}
 	for i := 0; i < BucketLen; i++ {
 		n.buckets[i] = &bucket{}
@@ -232,4 +232,36 @@ func (n *Node) Bootstrap(bootstrapAddrs []string) {
 
 func (n *Node) Store() *Store {
 	return n.store
+}
+
+func (n *Node) IDHex() string {
+	return n.ID.String()
+}
+
+func (n *Node) Address() string {
+	return n.addr
+}
+
+func (n *Node) PeerCount() int {
+	total := 0
+	for i := 0; i < BucketLen; i++ {
+		n.buckets[i].mu.RLock()
+		total += len(n.buckets[i].contacts)
+		n.buckets[i].mu.RUnlock()
+	}
+	return total
+}
+
+func (n *Node) RecordCount() int {
+	return n.store.Len()
+}
+
+func (n *Node) GetPeers() []string {
+	var peers []string
+	for i := 0; i < BucketLen; i++ {
+		for _, c := range n.buckets[i].getContacts() {
+			peers = append(peers, c.Address)
+		}
+	}
+	return peers
 }

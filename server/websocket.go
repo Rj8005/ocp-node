@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"ocp-node/dht"
+	"github.com/Rj8005/ocp-node/dht"
 )
 
 // Message types for the OCP DHT protocol.
