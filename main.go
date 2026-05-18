@@ -68,7 +68,8 @@ func main() {
 		logger.Println("[main] no bootstrap peers configured — running as seed node")
 	}
 
-	httpServer := server.NewHTTPServer(node, httpPort)
+	msgStore := server.NewMessageStore("messages.json")
+	httpServer := server.NewHTTPServer(node, httpPort, msgStore)
 	go func() {
 		logger.Printf("[main] HTTP server starting on port %d", httpPort)
 		if err := httpServer.Start(); err != nil {

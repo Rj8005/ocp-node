@@ -19,13 +19,15 @@ type HTTPServer struct {
 	node      *dht.Node
 	startTime time.Time
 	port      int
+	msgStore  *MessageStore
 }
 
-func NewHTTPServer(node *dht.Node, port int) *HTTPServer {
+func NewHTTPServer(node *dht.Node, port int, msgStore *MessageStore) *HTTPServer {
 	return &HTTPServer{
 		node:      node,
 		startTime: time.Now(),
 		port:      port,
+		msgStore:  msgStore,
 	}
 }
 
@@ -34,6 +36,8 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/peers", s.handlePeers)
 	mux.HandleFunc("/records", s.handleRecords)
+	mux.HandleFunc("/store", s.handleStoreMessage)
+	mux.HandleFunc("/pending", s.handleGetPending)
 	mux.HandleFunc("/ws", s.handleWebSocket)
 	mux.HandleFunc("/", s.handleRoot)
 
@@ -86,6 +90,44 @@ func (s *HTTPServer) handleRecords(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"count": s.node.RecordCount(),
+	})
+}
+
+func (s *HTTPServer) handleStoreMessage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "POST only", 405)
+		return
+	}
+	var req struct {
+		ToOCP   string `json:"to_ocp"`
+		FromOCP string `json:"from_ocp"`
+		Body    string `json:"body"`
+		TTLDays int    `json:"ttl_days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", 400)
+		return
+	}
+	if req.TTLDays <= 0 {
+		req.TTLDays = 7
+	}
+	id := s.msgStore.Store(req.ToOCP, req.FromOCP, req.Body, req.TTLDays)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"id": id, "status": "stored"})
+}
+
+func (s *HTTPServer) handleGetPending(w http.ResponseWriter, r *http.Request) {
+	ocp := r.URL.Query().Get("ocp")
+	if ocp == "" {
+		http.Error(w, "ocp param required", 400)
+		return
+	}
+	msgs := s.msgStore.GetPending(ocp)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"messages": msgs,
+		"count":    len(msgs),
 	})
 }
 
