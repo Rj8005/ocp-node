@@ -76,6 +76,13 @@ func main() {
 		}
 	}()
 
+	turnServer := server.NewTURNServer()
+	go func() {
+		if err := turnServer.Start(); err != nil {
+			logger.Printf("[main] TURN server error: %v", err)
+		}
+	}()
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	s := <-sig
