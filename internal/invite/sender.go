@@ -35,22 +35,23 @@ func GenerateInviteToken(ocpAddress string) string {
 
 // SendSMSInvite sends a short invite message to toE164 via its carrier's
 // email-to-SMS gateway. fromOCPAddress is embedded in the invite token.
+// Returns the matched carrier name on success.
 //
 // The message body is intentionally kept under 160 characters so it fits
 // in a single SMS segment on every carrier.
-func SendSMSInvite(cfg InviteConfig, toE164 string, fromOCPAddress string) error {
+func SendSMSInvite(cfg InviteConfig, toE164 string, fromOCPAddress string) (string, error) {
 	if cfg.SMTPHost == "" {
-		return fmt.Errorf("invite: SMTP not configured (set SMTP_HOST)")
+		return "", fmt.Errorf("invite: SMTP not configured (set SMTP_HOST)")
 	}
 
 	rec, err := carrier.Lookup(toE164)
 	if err != nil {
-		return fmt.Errorf("invite: %w", err)
+		return "", fmt.Errorf("invite: %w", err)
 	}
 
 	gatewayAddr, err := carrier.GatewayAddress(toE164)
 	if err != nil {
-		return fmt.Errorf("invite: gateway address: %w", err)
+		return "", fmt.Errorf("invite: gateway address: %w", err)
 	}
 
 	log.Printf("[invite] carrier=%s gateway=%s to=%s", rec.CarrierName, rec.EmailGateway, gatewayAddr)
@@ -69,14 +70,20 @@ func SendSMSInvite(cfg InviteConfig, toE164 string, fromOCPAddress string) error
 	// Port 465 = implicit TLS (SMTPS).  All other ports go through smtp.SendMail
 	// which negotiates STARTTLS automatically when the server offers it.
 	if cfg.SMTPPort == 465 {
-		return sendImplicitTLS(cfg, addr, gatewayAddr, []byte(msg))
+		if err := sendImplicitTLS(cfg, addr, gatewayAddr, []byte(msg)); err != nil {
+			return "", err
+		}
+		return rec.CarrierName, nil
 	}
 
 	var auth smtp.Auth
 	if cfg.SMTPUsername != "" {
 		auth = smtp.PlainAuth("", cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPHost)
 	}
-	return smtp.SendMail(addr, auth, cfg.FromAddress, []string{gatewayAddr}, []byte(msg))
+	if err := smtp.SendMail(addr, auth, cfg.FromAddress, []string{gatewayAddr}, []byte(msg)); err != nil {
+		return "", err
+	}
+	return rec.CarrierName, nil
 }
 
 // sendImplicitTLS handles SMTPS (port 465) where TLS wraps the whole
