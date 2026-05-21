@@ -35,7 +35,7 @@ func NewHTTPServer(node *dht.Node, port int, msgStore *MessageStore, inviteCfg i
 	}
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -59,13 +59,15 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/invite/channels", iserver.HandleGetChannels)
 	mux.HandleFunc("/invite/send", iserver.HandleSendInvite)
 	mux.HandleFunc("/invite/token", iserver.HandleGetToken)
+	mux.HandleFunc("/reach/textbelt", iserver.HandleTextBeltSend)
+	mux.HandleFunc("/reach/missed-call", iserver.HandleMissedCall)
 	mux.HandleFunc("/invite", s.handleInvite)
 	mux.HandleFunc("/ws", s.handleWebSocket)
 	mux.HandleFunc("/", s.handleRoot)
 
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("[http] listening on %s", addr)
-	return http.ListenAndServe(addr, corsMiddleware(mux))
+	return http.ListenAndServe(addr, withCORS(mux))
 }
 
 func (s *HTTPServer) handleRoot(w http.ResponseWriter, r *http.Request) {

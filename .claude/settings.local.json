@@ -6,7 +6,9 @@
       "Bash(git commit -m ' *)",
       "Bash(mkdir -p \"F:\\\\ocp-node\\\\internal\\\\carrier\")",
       "Bash(go vet *)",
-      "Bash(xargs grep -l \"http\\\\.\")"
+      "Bash(xargs grep -l \"http\\\\.\")",
+      "Bash(go get *)",
+      "Bash(go doc *)"
     ],
     "additionalDirectories": [
       "F:\\ocp-node\\internal"

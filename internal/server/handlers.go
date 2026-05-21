@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Rj8005/ocp-node/internal/carrier"
+	"github.com/Rj8005/ocp-node/internal/channels"
 )
 
 // apiClient is shared across all outbound API calls.
@@ -195,16 +196,64 @@ func HandleSendInvite(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleMissedCall handles GET /reach/missed-call
+//
+// Query params:
+//
+//	to        E.164 number to dial (e.g. "+919800505720")
+//	inviteURL Full invite URL embedded in the SIP INVITE as X-OCP-Invite
+func HandleMissedCall(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	to := r.URL.Query().Get("to")
+	inviteURL := r.URL.Query().Get("inviteURL")
+
+	if os.Getenv("SIP_USERNAME") == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  false,
+			"fallback": "sip_not_configured",
+			"message":  "Set SIP_USERNAME env var on Render to enable missed calls",
+		})
+		return
+	}
+
+	err := channels.SendMissedCall(to, inviteURL)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"channel": "missed_call",
+	})
+}
+
 // HandleTextBeltSend handles POST /reach/textbelt
 // Uses the free-tier TextBelt key (1 SMS/day per IP). No configuration needed.
 func HandleTextBeltSend(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
 	var body struct {
 		To        string `json:"to"`
 		InviteURL string `json:"inviteURL"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, "error": "invalid body",
+		})
+		return
+	}
 
-	message := "Call me free on OpenCall — tap to answer, no app needed: " + body.InviteURL
+	message := fmt.Sprintf(
+		"Someone wants to call you free on OpenCall. "+
+			"No app needed — just tap: %s", body.InviteURL,
+	)
 
 	resp, err := apiClient.PostForm("https://textbelt.com/text", url.Values{
 		"phone":   {body.To},
@@ -212,9 +261,9 @@ func HandleTextBeltSend(w http.ResponseWriter, r *http.Request) {
 		"key":     {"textbelt"},
 	})
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false, "error": err.Error(),
+			"success": false, "error": "textbelt unreachable",
 		})
 		return
 	}
@@ -223,7 +272,6 @@ func HandleTextBeltSend(w http.ResponseWriter, r *http.Request) {
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
 }
 
