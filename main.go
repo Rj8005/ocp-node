@@ -12,11 +12,13 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Rj8005/ocp-node/dht"
+	"github.com/Rj8005/ocp-node/internal/invite"
 	"github.com/Rj8005/ocp-node/server"
 )
 
@@ -68,8 +70,24 @@ func main() {
 		logger.Println("[main] no bootstrap peers configured — running as seed node")
 	}
 
+	smtpPort, _ := strconv.Atoi(os.Getenv("SMTP_PORT"))
+	if smtpPort == 0 {
+		smtpPort = 587
+	}
+	inviteCfg := invite.InviteConfig{
+		SMTPHost:      os.Getenv("SMTP_HOST"),
+		SMTPPort:      smtpPort,
+		SMTPUsername:  os.Getenv("SMTP_USER"),
+		SMTPPassword:  os.Getenv("SMTP_PASS"),
+		FromAddress:   os.Getenv("SMTP_FROM"),
+		InviteBaseURL: os.Getenv("INVITE_BASE_URL"),
+	}
+	if inviteCfg.InviteBaseURL == "" {
+		inviteCfg.InviteBaseURL = "https://opencall.net/invite"
+	}
+
 	msgStore := server.NewMessageStore("messages.json")
-	httpServer := server.NewHTTPServer(node, httpPort, msgStore)
+	httpServer := server.NewHTTPServer(node, httpPort, msgStore, inviteCfg)
 	go func() {
 		logger.Printf("[main] HTTP server starting on port %d", httpPort)
 		if err := httpServer.Start(); err != nil {

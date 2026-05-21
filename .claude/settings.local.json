@@ -3,7 +3,13 @@
     "allow": [
       "Bash(go build *)",
       "Bash(Remove-Item F:\\\\ocp-node\\\\fly.toml)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(mkdir -p \"F:\\\\ocp-node\\\\internal\\\\carrier\")",
+      "Bash(go vet *)",
+      "Bash(xargs grep -l \"http\\\\.\")"
+    ],
+    "additionalDirectories": [
+      "F:\\ocp-node\\internal"
     ]
   }
 }

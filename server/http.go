@@ -13,22 +13,40 @@ import (
 	"time"
 
 	"github.com/Rj8005/ocp-node/dht"
+	"github.com/Rj8005/ocp-node/internal/invite"
+	iserver "github.com/Rj8005/ocp-node/internal/server"
 )
 
 type HTTPServer struct {
-	node      *dht.Node
-	startTime time.Time
-	port      int
-	msgStore  *MessageStore
+	node       *dht.Node
+	startTime  time.Time
+	port       int
+	msgStore   *MessageStore
+	inviteCfg  invite.InviteConfig
 }
 
-func NewHTTPServer(node *dht.Node, port int, msgStore *MessageStore) *HTTPServer {
+func NewHTTPServer(node *dht.Node, port int, msgStore *MessageStore, inviteCfg invite.InviteConfig) *HTTPServer {
 	return &HTTPServer{
 		node:      node,
 		startTime: time.Now(),
 		port:      port,
 		msgStore:  msgStore,
+		inviteCfg: inviteCfg,
 	}
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *HTTPServer) Start() error {
@@ -38,12 +56,16 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/records", s.handleRecords)
 	mux.HandleFunc("/store", s.handleStoreMessage)
 	mux.HandleFunc("/pending", s.handleGetPending)
+	mux.HandleFunc("/invite/channels", iserver.HandleGetChannels)
+	mux.HandleFunc("/invite/send", iserver.HandleSendInvite)
+	mux.HandleFunc("/invite/token", iserver.HandleGetToken)
+	mux.HandleFunc("/invite", s.handleInvite)
 	mux.HandleFunc("/ws", s.handleWebSocket)
 	mux.HandleFunc("/", s.handleRoot)
 
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("[http] listening on %s", addr)
-	return http.ListenAndServe(addr, mux)
+	return http.ListenAndServe(addr, corsMiddleware(mux))
 }
 
 func (s *HTTPServer) handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +150,43 @@ func (s *HTTPServer) handleGetPending(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"messages": msgs,
 		"count":    len(msgs),
+	})
+}
+
+func (s *HTTPServer) handleInvite(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Phone   string `json:"phone"`
+		FromOCP string `json:"from_ocp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Phone == "" || req.FromOCP == "" {
+		http.Error(w, `"phone" and "from_ocp" are required`, http.StatusBadRequest)
+		return
+	}
+	carrierName, err := invite.SendSMSInvite(s.inviteCfg, req.Phone, req.FromOCP)
+	if err != nil {
+		log.Printf("[http] invite error to=%s: %v", req.Phone, err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	log.Printf("[http] invite sent to=%s carrier=%s", req.Phone, carrierName)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "sent",
+		"carrier": carrierName,
 	})
 }
 
