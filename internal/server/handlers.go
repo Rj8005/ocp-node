@@ -195,6 +195,38 @@ func HandleSendInvite(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleTextBeltSend handles POST /reach/textbelt
+// Uses the free-tier TextBelt key (1 SMS/day per IP). No configuration needed.
+func HandleTextBeltSend(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		To        string `json:"to"`
+		InviteURL string `json:"inviteURL"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+
+	message := "Call me free on OpenCall — tap to answer, no app needed: " + body.InviteURL
+
+	resp, err := apiClient.PostForm("https://textbelt.com/text", url.Values{
+		"phone":   {body.To},
+		"message": {message},
+		"key":     {"textbelt"},
+	})
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, "error": err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
 // SendTextBelt sends message to toE164 via the TextBelt SMS API.
 // The key "textbelt" is the public free-tier key (1 SMS/day per IP).
 // Set the key via the TEXTBELT_KEY env var to use a paid quota.
