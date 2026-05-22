@@ -81,7 +81,7 @@ func (s *HTTPServer) handleRoot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"service": "OCP DHT Bootstrap Node",
-		"version": "1.0.0",
+		"version": "2.0.0",
 		"status":  "running",
 	})
 }
