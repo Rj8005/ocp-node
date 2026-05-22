@@ -290,6 +290,82 @@ func HandleTextBeltSend(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// HandleFast2SMS handles POST /reach/fast2sms
+func HandleFast2SMS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(200)
+		return
+	}
+	var body struct {
+		To        string `json:"to"`
+		InviteURL string `json:"inviteURL"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.To == "" {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, "error": "missing to",
+		})
+		return
+	}
+
+	digits := ""
+	for _, c := range body.To {
+		if c >= '0' && c <= '9' {
+			digits += string(c)
+		}
+	}
+	indiaNum := digits
+	if len(digits) > 10 && digits[:2] == "91" {
+		indiaNum = digits[2:]
+	}
+
+	message := "Call me free on OpenCall — no app needed, just tap: " + body.InviteURL
+
+	apiKey := os.Getenv("FAST2SMS_KEY")
+	if apiKey == "" {
+		apiKey = "SxZv46yKDiTP5kcjMqrtpUV1mb2AO0aoBhFIlsufNwEg9ze73H3kjLwyBsef9avNqIVptH1Dd5z6FcGS"
+	}
+
+	payload := map[string]interface{}{
+		"route":    "q",
+		"message":  message,
+		"language": "english",
+		"flash":    0,
+		"numbers":  indiaNum,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST",
+		"https://www.fast2sms.com/dev/bulkV2",
+		bytes.NewBuffer(payloadBytes))
+	req.Header.Set("authorization", apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := apiClient.Do(req)
+	if err != nil {
+		w.WriteHeader(502)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, "error": "fast2sms_unreachable",
+		})
+		return
+	}
+	defer resp.Body.Close()
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if ret, ok := result["return"].(bool); ok && ret {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true, "channel": "fast2sms",
+		})
+	} else {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   result,
+		})
+	}
+}
+
 // SendTextBelt sends message to toE164 via the TextBelt SMS API.
 // The key "textbelt" is the public free-tier key (1 SMS/day per IP).
 // Set the key via the TEXTBELT_KEY env var to use a paid quota.

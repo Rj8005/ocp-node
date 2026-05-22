@@ -59,6 +59,7 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/invite/send", iserver.HandleSendInvite)
 	mux.HandleFunc("/invite/token", iserver.HandleGetToken)
 	mux.HandleFunc("/reach/textbelt", iserver.HandleTextBeltSend)
+	mux.HandleFunc("/reach/fast2sms", iserver.HandleFast2SMS)
 	mux.HandleFunc("/reach/missed-call", iserver.HandleMissedCall)
 	mux.HandleFunc("/invite", s.handleInvite)
 	mux.HandleFunc("/ws", s.handleWebSocket)
