@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	httpPort = 5000
 	nodeAddr = "localhost:5000"
 )
 
@@ -86,10 +85,16 @@ func main() {
 		inviteCfg.InviteBaseURL = "https://opencall.net/invite"
 	}
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "5000"
+	}
+	addr := ":" + port
+
 	msgStore := server.NewMessageStore("messages.json")
-	httpServer := server.NewHTTPServer(node, httpPort, msgStore, inviteCfg)
+	httpServer := server.NewHTTPServer(node, msgStore, inviteCfg)
 	go func() {
-		logger.Printf("[main] HTTP server starting on port %d", httpPort)
+		logger.Printf("[main] HTTP server starting on %s", addr)
 		if err := httpServer.Start(); err != nil {
 			logger.Fatalf("[main] server error: %v", err)
 		}

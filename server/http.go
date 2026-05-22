@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -18,18 +19,16 @@ import (
 )
 
 type HTTPServer struct {
-	node       *dht.Node
-	startTime  time.Time
-	port       int
-	msgStore   *MessageStore
-	inviteCfg  invite.InviteConfig
+	node      *dht.Node
+	startTime time.Time
+	msgStore  *MessageStore
+	inviteCfg invite.InviteConfig
 }
 
-func NewHTTPServer(node *dht.Node, port int, msgStore *MessageStore, inviteCfg invite.InviteConfig) *HTTPServer {
+func NewHTTPServer(node *dht.Node, msgStore *MessageStore, inviteCfg invite.InviteConfig) *HTTPServer {
 	return &HTTPServer{
 		node:      node,
 		startTime: time.Now(),
-		port:      port,
 		msgStore:  msgStore,
 		inviteCfg: inviteCfg,
 	}
@@ -65,8 +64,12 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/ws", s.handleWebSocket)
 	mux.HandleFunc("/", s.handleRoot)
 
-	addr := fmt.Sprintf(":%d", s.port)
-	log.Printf("[http] listening on %s", addr)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "5000"
+	}
+	addr := ":" + port
+	log.Printf("[HTTP] Listening on %s", addr)
 	return http.ListenAndServe(addr, withCORS(mux))
 }
 
