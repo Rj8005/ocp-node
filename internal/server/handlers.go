@@ -328,16 +328,15 @@ func HandleFast2SMS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payloadBytes, _ := json.Marshal(map[string]interface{}{
-		"route":     "v3",
-		"sender_id": "TXTIND",
+		"sender_id": "FSTSMS",
 		"message":   message,
 		"language":  "english",
-		"flash":     0,
+		"route":     "p",
 		"numbers":   indiaNum,
 	})
 
 	req, _ := http.NewRequest("POST",
-		"https://www.fast2sms.com/dev/bulk",
+		"https://www.fast2sms.com/dev/bulkV2",
 		bytes.NewBuffer(payloadBytes))
 	req.Header.Set("authorization", apiKey)
 	req.Header.Set("Content-Type", "application/json")
