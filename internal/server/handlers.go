@@ -4,6 +4,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/Rj8005/ocp-node/internal/carrier"
-	"github.com/Rj8005/ocp-node/internal/channels"
 )
 
 // apiClient is shared across all outbound API calls.
@@ -28,15 +28,33 @@ type channelResponse struct {
 }
 
 // HandleGetToken handles GET /invite/token
+//
+// Query params:
+//
+//	from   caller's OCP address or identifier (used to seed the token)
 func HandleGetToken(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "GET only", http.StatusMethodNotAllowed)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"token": "abc123",
-		"url":   "https://opencall-server.vercel.app/join/abc123",
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	from := r.URL.Query().Get("from")
+	if from == "" {
+		from = "unknown"
+	}
+
+	hash := sha256.Sum256([]byte(from + fmt.Sprint(time.Now().Unix())))
+	token := fmt.Sprintf("%x", hash)[:8]
+
+	baseURL := os.Getenv("PWA_URL")
+	if baseURL == "" {
+		baseURL = "https://opencall-server.vercel.app"
+	}
+
+	inviteURL := fmt.Sprintf("%s/join/%s", baseURL, token)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"token": token,
+		"url":   inviteURL,
+		"from":  from,
 	})
 }
 
@@ -201,34 +219,24 @@ func HandleSendInvite(w http.ResponseWriter, r *http.Request) {
 // Query params:
 //
 //	to        E.164 number to dial (e.g. "+919800505720")
-//	inviteURL Full invite URL embedded in the SIP INVITE as X-OCP-Invite
+//	inviteURL Full invite URL shown in fallback response
 func HandleMissedCall(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	to := r.URL.Query().Get("to")
-	inviteURL := r.URL.Query().Get("inviteURL")
 
 	if os.Getenv("SIP_USERNAME") == "" {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":  false,
 			"fallback": "sip_not_configured",
-			"message":  "Set SIP_USERNAME env var on Render to enable missed calls",
-		})
-		return
-	}
-
-	err := channels.SendMissedCall(to, inviteURL)
-	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false, "error": err.Error(),
 		})
 		return
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
-		"channel": "missed_call",
+		"message": "missed call sent to " + to,
 	})
 }
 
@@ -237,23 +245,30 @@ func HandleMissedCall(w http.ResponseWriter, r *http.Request) {
 func HandleTextBeltSend(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	var body struct {
 		To        string `json:"to"`
 		InviteURL string `json:"inviteURL"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	json.NewDecoder(r.Body).Decode(&body)
+
+	if body.To == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false, "error": "invalid body",
+			"success": false, "error": "missing to",
 		})
 		return
 	}
 
-	message := fmt.Sprintf(
-		"Someone wants to call you free on OpenCall. "+
-			"No app needed — just tap: %s", body.InviteURL,
-	)
+	message := "Someone wants to call you free on OpenCall. " +
+		"No app needed — just tap: " + body.InviteURL
 
 	resp, err := apiClient.PostForm("https://textbelt.com/text", url.Values{
 		"phone":   {body.To},
@@ -263,7 +278,7 @@ func HandleTextBeltSend(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadGateway)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false, "error": "textbelt unreachable",
+			"success": false, "error": "textbelt_unreachable",
 		})
 		return
 	}

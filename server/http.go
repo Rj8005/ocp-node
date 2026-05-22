@@ -88,11 +88,13 @@ func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "ok",
-		"node_id": s.node.IDHex(),
-		"address": s.node.Address(),
-		"uptime":  int(time.Since(s.startTime).Seconds()),
-		"peers":   s.node.PeerCount(),
-		"records": s.node.RecordCount(),
+		"version": "2.0",
+		"endpoints": []string{
+			"/invite/token",
+			"/reach/textbelt",
+			"/reach/missed-call",
+			"/health",
+		},
 	})
 }
 
