@@ -315,6 +315,7 @@ var TextBeltFallbackCountries = map[string]bool{
 	"82": true, // Korea — unreliable
 	"66": true, // Thailand — unreliable
 	"98": true, // Iran — blocked
+	// "91" removed — India uses carrier email-to-SMS gateways directly
 }
 
 type SMSResult struct {
@@ -327,6 +328,24 @@ type SMSResult struct {
 // SendSMSWithFallback tries email-to-SMS first, falls back to TextBelt.
 func SendSMSWithFallback(toE164, message string) SMSResult {
 	country := extractCountryCode(toE164)
+
+	// India: try carrier email-to-SMS gateways directly; no TextBelt fallback
+	if country == "91" {
+		_, gw := findGateway(toE164)
+		if gw != "" {
+			log.Printf("[SMS] India carrier gateway: %s via %s", toE164, gw)
+			err := sendEmailToSMSGateway(toE164, gw, message)
+			if err == nil {
+				return SMSResult{Success: true, Method: "email_to_sms", Gateway: gw}
+			}
+			log.Printf("[SMS] India gateway %s failed: %v", gw, err)
+		}
+		return SMSResult{
+			Success: false,
+			Method:  "email_to_sms",
+			Error:   "India carrier gateway failed — SMTP may not be configured",
+		}
+	}
 
 	if TextBeltFallbackCountries[country] {
 		log.Printf("[SMS] Country %s → TextBelt directly", country)
