@@ -386,7 +386,7 @@ func SendSMSWithFallback(toE164, message string) SMSResult {
 func findGateway(e164 string) (string, string) {
 	digits := extractDigits(e164)
 
-	for _, l := range []int{5, 4, 3} {
+	for _, l := range []int{6, 5, 4, 3} {
 		if len(digits) >= l {
 			prefix := digits[:l]
 			if carrier, ok := PrefixToCarrier[prefix]; ok {
