@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Rj8005/ocp-node/internal/carrier"
+	"github.com/Rj8005/ocp-node/internal/firstcontact"
 )
 
 // apiClient is shared across all outbound API calls.
@@ -363,6 +364,41 @@ func HandleFast2SMS(w http.ResponseWriter, r *http.Request) {
 			"error":   result,
 		})
 	}
+}
+
+// HandleSendSMS handles POST /reach/sms — tries email-to-SMS then falls back to TextBelt.
+func HandleSendSMS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(200)
+		return
+	}
+
+	var body struct {
+		To        string `json:"to"`
+		InviteURL string `json:"inviteURL"`
+		FromName  string `json:"fromName"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+
+	if body.To == "" {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false, "error": "missing to",
+		})
+		return
+	}
+
+	name := body.FromName
+	if name == "" {
+		name = "Someone"
+	}
+
+	message := name + " wants to call you free on OpenCall. " +
+		"No app needed — tap: " + body.InviteURL
+
+	result := firstcontact.SendSMSWithFallback(body.To, message)
+	json.NewEncoder(w).Encode(result)
 }
 
 // SendTextBelt sends message to toE164 via the TextBelt SMS API.
