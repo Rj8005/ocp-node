@@ -9,6 +9,7 @@ import (
 	"net/smtp"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // ── Current working email-to-SMS gateways (2025) ──────────
@@ -425,6 +426,7 @@ func sendEmailToSMSGateway(toE164, gateway, message string) error {
 	smtpPort := os.Getenv("SMTP_PORT")
 	smtpUser := os.Getenv("SMTP_USER")
 	smtpPass := os.Getenv("SMTP_PASS")
+	smtpPass = strings.ReplaceAll(smtpPass, " ", "")
 	smtpFrom := os.Getenv("SMTP_FROM")
 
 	if smtpHost == "" {
@@ -439,6 +441,7 @@ func sendEmailToSMSGateway(toE164, gateway, message string) error {
 	if smtpUser == "" {
 		return fmt.Errorf("SMTP not configured")
 	}
+	log.Printf("[SMTP] Attempting auth with user=%s host=%s", smtpUser, smtpHost)
 
 	if len(message) > 140 {
 		message = message[:137] + "..."
