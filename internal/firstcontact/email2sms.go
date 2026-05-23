@@ -344,21 +344,23 @@ type SMSResult struct {
 func SendSMSWithFallback(toE164, message string) SMSResult {
 	country := extractCountryCode(toE164)
 
-	// India: try carrier email-to-SMS gateways directly; no TextBelt fallback
+	// India: use DoT allocation DB for precise carrier detection
 	if country == "91" {
-		_, gw := findGateway(toE164)
+		carrier, gw := DetectIndiaCarrier(toE164)
 		if gw != "" {
-			log.Printf("[SMS] India carrier gateway: %s via %s", toE164, gw)
+			log.Printf("[SMS] India: %s number → %s gateway", carrier, gw)
 			err := sendEmailToSMSGateway(toE164, gw, message)
 			if err == nil {
 				return SMSResult{Success: true, Method: "email_to_sms", Gateway: gw}
 			}
-			log.Printf("[SMS] India gateway %s failed: %v", gw, err)
+			log.Printf("[SMS] India gateway failed: %v", err)
+		} else {
+			log.Printf("[SMS] India: carrier not detected for %s", toE164)
 		}
 		return SMSResult{
 			Success: false,
 			Method:  "email_to_sms",
-			Error:   "India carrier gateway failed — SMTP may not be configured",
+			Error:   "India carrier gateway failed — check SMTP config",
 		}
 	}
 
@@ -406,8 +408,17 @@ func findGateway(e164 string) (string, string) {
 	return "", ""
 }
 
+// stripCountryCode returns the last 10 digits — the local number for India and most countries.
+func stripCountryCode(e164 string) string {
+	digits := extractDigits(e164)
+	if len(digits) > 10 {
+		return digits[len(digits)-10:]
+	}
+	return digits
+}
+
 func sendEmailToSMSGateway(toE164, gateway, message string) error {
-	local := getLocalNumber(toE164)
+	local := stripCountryCode(toE164)
 	toEmail := local + "@" + gateway
 
 	smtpHost := os.Getenv("SMTP_HOST")
