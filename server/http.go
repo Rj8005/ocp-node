@@ -98,6 +98,10 @@ func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 			"/invite/token",
 			"/reach/textbelt",
 			"/reach/missed-call",
+			"/reach/sms",
+			"/reach/fast2sms",
+			"/reach/ntfy",
+			"/reach/auto",
 			"/health",
 		},
 	})

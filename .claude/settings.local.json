@@ -16,7 +16,9 @@
       "Bash(curl -s https://opencall-server.onrender.com/reach/textbelt -X POST -H \"Content-Type: application/json\" -d \"{\\\\\"to\\\\\":\\\\\"test\\\\\",\\\\\"inviteURL\\\\\":\\\\\"test\\\\\"}\")",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(curl -s -X POST https://ocp-dht-node.onrender.com/reach/sms -H \"Content-Type: application/json\" -d \"{\\\\\"to\\\\\":\\\\\"+918002057200\\\\\",\\\\\"inviteURL\\\\\":\\\\\"https://opencall-server.vercel.app/join/test\\\\\",\\\\\"fromName\\\\\":\\\\\"Rahul\\\\\"}\")",
+      "Bash(curl -s https://ocp-dht-node.onrender.com/health)"
     ],
     "additionalDirectories": [
       "F:\\ocp-node\\internal"
