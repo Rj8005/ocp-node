@@ -43,12 +43,12 @@ Free-tier Render instances spin down after inactivity. For a reliable bootstrap 
 
 ### Updating bootstrap addresses
 
-After deploying, copy the Render service URL (e.g. `ocp-bootstrap-1.onrender.com`) and update `main.go`:
+After deploying, copy the Render service URL (e.g. `ocp-bootstrap-1-nui5.onrender.com`) and update `main.go`:
 
 ```go
 var bootstrapNodes = []string{
-    "ocp-bootstrap-1.onrender.com:443",
-    "ocp-bootstrap-2.onrender.com:443",
+    "ocp-bootstrap-1-nui5.onrender.com:443",
+    "ocp-node.onrender.com:443",
 }
 ```
 
