@@ -13,7 +13,10 @@
       "Bash(curl -s -X POST https://opencall-server.onrender.com/reach/textbelt -H \"Content-Type: application/json\" -d \"{\\\\\"to\\\\\":\\\\\"+919800505720\\\\\",\\\\\"inviteURL\\\\\":\\\\\"https://opencall-server.vercel.app/join/abc\\\\\"}\")",
       "Bash(curl -s \"https://opencall-server.onrender.com/reach/missed-call?to=%2B919800505720\")",
       "Bash(curl -s https://opencall-server.onrender.com/debug/routes)",
-      "Bash(curl -s https://opencall-server.onrender.com/reach/textbelt -X POST -H \"Content-Type: application/json\" -d \"{\\\\\"to\\\\\":\\\\\"test\\\\\",\\\\\"inviteURL\\\\\":\\\\\"test\\\\\"}\")"
+      "Bash(curl -s https://opencall-server.onrender.com/reach/textbelt -X POST -H \"Content-Type: application/json\" -d \"{\\\\\"to\\\\\":\\\\\"test\\\\\",\\\\\"inviteURL\\\\\":\\\\\"test\\\\\"}\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "F:\\ocp-node\\internal"

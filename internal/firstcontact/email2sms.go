@@ -1,7 +1,9 @@
 package firstcontact
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 // ── Current working email-to-SMS gateways (2025) ──────────
@@ -422,12 +425,81 @@ func sendEmailToSMSGateway(toE164, gateway, message string) error {
 	local := stripCountryCode(toE164)
 	toEmail := local + "@" + gateway
 
+	refreshToken := os.Getenv("GMAIL_REFRESH_TOKEN")
+	clientID := os.Getenv("GMAIL_CLIENT_ID")
+	clientSecret := os.Getenv("GMAIL_CLIENT_SECRET")
+	fromEmail := os.Getenv("SMTP_FROM")
+
+	if refreshToken == "" {
+		return sendViaSMTP(toEmail, fromEmail, message)
+	}
+
+	// Step 1: Get fresh access token
+	tokenResp, err := http.PostForm(
+		"https://oauth2.googleapis.com/token",
+		url.Values{
+			"grant_type":    {"refresh_token"},
+			"refresh_token": {refreshToken},
+			"client_id":     {clientID},
+			"client_secret": {clientSecret},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("token refresh failed: %w", err)
+	}
+	defer tokenResp.Body.Close()
+
+	var tokenData struct {
+		AccessToken string `json:"access_token"`
+		Error       string `json:"error"`
+	}
+	json.NewDecoder(tokenResp.Body).Decode(&tokenData)
+	if tokenData.AccessToken == "" {
+		return fmt.Errorf("no access token: %s", tokenData.Error)
+	}
+
+	// Step 2: Build RFC 2822 email message
+	if len(message) > 140 {
+		message = message[:137] + "..."
+	}
+	rawMsg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: \r\n\r\n%s",
+		fromEmail, toEmail, message)
+
+	// Step 3: Base64 URL encode
+	encoded := base64.URLEncoding.EncodeToString([]byte(rawMsg))
+
+	// Step 4: Send via Gmail API (port 443 — never blocked by Render)
+	body, _ := json.Marshal(map[string]string{"raw": encoded})
+	req, _ := http.NewRequest(
+		"POST",
+		"https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+		bytes.NewBuffer(body),
+	)
+	req.Header.Set("Authorization", "Bearer "+tokenData.AccessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("gmail API send failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 200 || resp.StatusCode == 202 {
+		log.Printf("[Gmail API] Sent to %s", toEmail)
+		return nil
+	}
+
+	var errResp map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	return fmt.Errorf("gmail API error %d: %v", resp.StatusCode, errResp)
+}
+
+func sendViaSMTP(toEmail, fromEmail, message string) error {
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
 	smtpUser := os.Getenv("SMTP_USER")
-	smtpPass := os.Getenv("SMTP_PASS")
-	smtpPass = strings.ReplaceAll(smtpPass, " ", "")
-	smtpFrom := os.Getenv("SMTP_FROM")
+	smtpPass := strings.ReplaceAll(os.Getenv("SMTP_PASS"), " ", "")
 
 	if smtpHost == "" {
 		smtpHost = "smtp.gmail.com"
@@ -435,26 +507,26 @@ func sendEmailToSMSGateway(toE164, gateway, message string) error {
 	if smtpPort == "" {
 		smtpPort = "587"
 	}
-	if smtpFrom == "" {
-		smtpFrom = smtpUser
+	if fromEmail == "" {
+		fromEmail = smtpUser
 	}
 	if smtpUser == "" {
 		return fmt.Errorf("SMTP not configured")
 	}
-	log.Printf("[SMTP] Attempting auth with user=%s host=%s", smtpUser, smtpHost)
+	log.Printf("[SMTP] Attempting auth with user=%s host=%s to=%s", smtpUser, smtpHost, toEmail)
 
 	if len(message) > 140 {
 		message = message[:137] + "..."
 	}
 
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: \r\n\r\n%s",
-		smtpFrom, toEmail, message)
+		fromEmail, toEmail, message)
 
 	addr := smtpHost + ":" + smtpPort
 	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
-	_ = &tls.Config{ServerName: smtpHost} // kept for future TLS dial upgrade
+	_ = &tls.Config{ServerName: smtpHost}
 
-	return smtp.SendMail(addr, auth, smtpFrom, []string{toEmail}, []byte(msg))
+	return smtp.SendMail(addr, auth, fromEmail, []string{toEmail}, []byte(msg))
 }
 
 func sendViaTextBelt(toE164, message string) SMSResult {
