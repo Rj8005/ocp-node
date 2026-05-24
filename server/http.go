@@ -62,6 +62,7 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/reach/fast2sms", iserver.HandleFast2SMS)
 	mux.HandleFunc("/reach/sms", iserver.HandleSendSMS)
 	mux.HandleFunc("/reach/missed-call", iserver.HandleMissedCall)
+	mux.HandleFunc("/debug/env", s.handleDebugEnv)
 	mux.HandleFunc("/invite", s.handleInvite)
 	mux.HandleFunc("/ws", s.handleWebSocket)
 	mux.HandleFunc("/", s.handleRoot)
@@ -85,6 +86,25 @@ func (s *HTTPServer) handleRoot(w http.ResponseWriter, r *http.Request) {
 		"service": "OCP DHT Bootstrap Node",
 		"version": "2.0.0",
 		"status":  "running",
+	})
+}
+
+func (s *HTTPServer) handleDebugEnv(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	gmailToken := os.Getenv("GMAIL_REFRESH_TOKEN")
+	gmailID := os.Getenv("GMAIL_CLIENT_ID")
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpFrom := os.Getenv("SMTP_FROM")
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"gmail_token_set": gmailToken != "",
+		"gmail_token_len": len(gmailToken),
+		"gmail_id_set":    gmailID != "",
+		"smtp_user_set":   smtpUser != "",
+		"smtp_from_set":   smtpFrom != "",
+		"smtp_from":       smtpFrom,
 	})
 }
 
