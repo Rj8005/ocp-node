@@ -358,14 +358,10 @@ func SendSMSWithFallback(toE164, message string) SMSResult {
 				return SMSResult{Success: true, Method: "email_to_sms", Gateway: gw}
 			}
 			log.Printf("[SMS] India gateway failed: %v", err)
-		} else {
-			log.Printf("[SMS] India: carrier not detected for %s", toE164)
+			return SMSResult{Success: false, Method: "email_to_sms", Error: err.Error()}
 		}
-		return SMSResult{
-			Success: false,
-			Method:  "email_to_sms",
-			Error:   "India carrier gateway failed — check SMTP config",
-		}
+		log.Printf("[SMS] India: carrier not detected for %s", toE164)
+		return SMSResult{Success: false, Method: "email_to_sms", Error: "carrier not detected"}
 	}
 
 	if TextBeltFallbackCountries[country] {
