@@ -62,6 +62,8 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/reach/fast2sms", iserver.HandleFast2SMS)
 	mux.HandleFunc("/reach/sms", iserver.HandleSendSMS)
 	mux.HandleFunc("/reach/missed-call", iserver.HandleMissedCall)
+	mux.HandleFunc("/ussd/callback", iserver.HandleUSSDCallback)
+	mux.HandleFunc("/ussd/gupshup/callback", iserver.HandleUSSDCallback)
 	mux.HandleFunc("/debug/env", s.handleDebugEnv)
 	mux.HandleFunc("/invite", s.handleInvite)
 	mux.HandleFunc("/ws", s.handleWebSocket)
@@ -122,8 +124,11 @@ func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 			"/reach/fast2sms",
 			"/reach/ntfy",
 			"/reach/auto",
+			"/ussd/callback",
+			"/ussd/gupshup/callback",
 			"/health",
 		},
+		"ussd_regions": []string{"Africa", "India", "Bangladesh", "Pakistan"},
 	})
 }
 

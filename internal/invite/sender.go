@@ -2,6 +2,7 @@
 package invite
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
@@ -13,6 +14,32 @@ import (
 
 	"github.com/Rj8005/ocp-node/internal/carrier"
 )
+
+// InviteResult describes which channel delivered the invite and whether it succeeded.
+type InviteResult struct {
+	Channel string
+	Country string
+	Success bool
+}
+
+// pendingUSSDSessions maps sessionID → callID for USSD callback lookup.
+var pendingUSSDSessions = map[string]string{}
+
+// RegisterUSSDSession records the callID for an in-flight USSD session.
+func RegisterUSSDSession(sessionID, callID string) {
+	pendingUSSDSessions[sessionID] = callID
+}
+
+// LookupUSSDSession returns the callID for a USSD session, or "" if unknown.
+func LookupUSSDSession(sessionID string) string {
+	return pendingUSSDSessions[sessionID]
+}
+
+func generateSessionID() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return fmt.Sprintf("OCP_%x", b)
+}
 
 // InviteConfig holds SMTP credentials and invite-link settings.
 type InviteConfig struct {
@@ -31,6 +58,42 @@ func GenerateInviteToken(ocpAddress string) string {
 	h.Write([]byte(ocpAddress))
 	h.Write([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
 	return hex.EncodeToString(h.Sum(nil))[:8]
+}
+
+// SendInvite tries USSD first (carrier-level, no app needed), then falls
+// through to the email-to-SMS gateway path via SendSMSInvite.
+func SendInvite(cfg InviteConfig, toE164 string, fromNumber string, fromOCPAddress string, callID string) (InviteResult, error) {
+	token := GenerateInviteToken(fromOCPAddress)
+	base := strings.TrimRight(cfg.InviteBaseURL, "/")
+	inviteURL := base + "/" + token
+
+	// --- USSD FIRST (carrier-level, no app needed) ---
+	gwConfig := DetectUSSDGateway(toE164)
+	sessionID := generateSessionID()
+
+	switch gwConfig.Gateway {
+	case GatewayAfricasTalking:
+		err := SendUSSDAfricasTalking(toE164, fromNumber, inviteURL, sessionID)
+		if err == nil {
+			RegisterUSSDSession(sessionID, callID)
+			return InviteResult{Channel: "ussd_at", Country: gwConfig.CountryName, Success: true}, nil
+		}
+		log.Printf("[invite] AT USSD failed for %s: %v", toE164, err)
+
+	case GatewayGupshup:
+		err := SendUSSDGupshup(toE164, fromNumber, inviteURL)
+		if err == nil {
+			return InviteResult{Channel: "ussd_gupshup", Country: gwConfig.CountryName, Success: true}, nil
+		}
+		log.Printf("[invite] Gupshup USSD failed for %s: %v", toE164, err)
+	}
+
+	// Fall through to existing channel logic (deep links etc)
+	carrierName, err := SendSMSInvite(cfg, toE164, fromOCPAddress)
+	if err != nil {
+		return InviteResult{Success: false}, err
+	}
+	return InviteResult{Channel: "sms", Country: carrierName, Success: true}, nil
 }
 
 // SendSMSInvite sends a short invite message to toE164 via its carrier's
