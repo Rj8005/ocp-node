@@ -18,7 +18,15 @@
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(curl -s -X POST https://ocp-dht-node.onrender.com/reach/sms -H \"Content-Type: application/json\" -d \"{\\\\\"to\\\\\":\\\\\"+918002057200\\\\\",\\\\\"inviteURL\\\\\":\\\\\"https://opencall-server.vercel.app/join/test\\\\\",\\\\\"fromName\\\\\":\\\\\"Rahul\\\\\"}\")",
-      "Bash(curl -s https://ocp-dht-node.onrender.com/health)"
+      "Bash(curl -s https://ocp-dht-node.onrender.com/health)",
+      "Bash(git -C \"F:\\\\OpenCall\" diff pwa/index.html pwa/answer.html)",
+      "Bash(git -C \"F:\\\\ocp-node\" add README.md)",
+      "Bash(git -C \"F:\\\\ocp-node\" commit -m \"fix: update README URLs to new Render deployments\")",
+      "Bash(git -C \"F:\\\\ocp-node\" push origin main)",
+      "Bash(curl -s https://opencall-server-pqfe.onrender.com/health)",
+      "Bash(curl -s https://ocp-dht-node-5ul1.onrender.com/health)",
+      "Bash(curl -s https://ocp-bootstrap-1-nui5.onrender.com/health)",
+      "Bash(curl -s https://ocp-node.onrender.com/health)"
     ],
     "additionalDirectories": [
       "F:\\ocp-node\\internal"

@@ -64,6 +64,8 @@ func (s *HTTPServer) Start() error {
 	mux.HandleFunc("/reach/missed-call", iserver.HandleMissedCall)
 	mux.HandleFunc("/ussd/callback", iserver.HandleUSSDCallback)
 	mux.HandleFunc("/ussd/gupshup/callback", iserver.HandleUSSDCallback)
+	mux.HandleFunc("/relay/register", s.HandleRelayRegister)
+	mux.HandleFunc("/relay/lookup", s.HandleRelayLookup)
 	mux.HandleFunc("/debug/env", s.handleDebugEnv)
 	mux.HandleFunc("/invite", s.handleInvite)
 	mux.HandleFunc("/ws", s.handleWebSocket)
@@ -126,6 +128,8 @@ func (s *HTTPServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 			"/reach/auto",
 			"/ussd/callback",
 			"/ussd/gupshup/callback",
+			"/relay/register",
+			"/relay/lookup",
 			"/health",
 		},
 		"ussd_regions": []string{"Africa", "India", "Bangladesh", "Pakistan"},
